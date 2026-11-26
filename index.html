@@ -97,7 +97,7 @@ input[type=date]::-webkit-datetime-edit{padding:0}
 .chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
 .block{padding:12px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .block>.lbl{font-weight:500}
-.signs{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.signs{display:grid;grid-template-columns:minmax(0,420px);gap:0}
 .signs>div{padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .signs>div+div{border-left:1px solid var(--line)}
 .signs h3{margin:0;font-size:14px}
@@ -283,21 +283,17 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--sunk)}
     </div>
 
     <div class="sec">
-      <header><span class="n">05</span><h2>Independent final verification</h2></header>
+      <header><span class="n">05</span><h2>Final verification</h2></header>
       <div class="signs">
-        <div><h3>Checker 1 (Preparer)</h3>
+        <div><h3>Checker</h3>
           <label class="f">Name<input type="text" id="f-c1" autocomplete="off" list="staff"></label>
           <div class="pad" data-pad="1"><canvas></canvas><span>Sign here</span><button type="button" class="clr">Clear</button></div></div>
-        <div><h3>Checker 2 (Independent)</h3>
-          <label class="f">Name<input type="text" id="f-c2" autocomplete="off" list="staff"></label>
-          <div class="pad" data-pad="2"><canvas></canvas><span>Sign here</span><button type="button" class="clr">Clear</button></div></div>
       </div>
       <datalist id="staff"></datalist>
       <div class="release">
         <button type="button" class="rel" data-v="verified">Verified and ready for dispensing<small>All checks complete</small></button>
         <button type="button" class="rel" data-v="not_ready">Not ready<small>Discrepancy unresolved</small></button>
       </div>
-      <p class="note">The independent checker verifies against the original prescription and the physical product, not simply the preparer's work.</p>
     </div>
   </div>
 </section>
@@ -336,7 +332,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--sunk)}
     <div class="range" id="r-filter"><button data-f="all" aria-pressed="true">All</button><button data-f="disc">Discrepancies</button><button data-f="notready">Not ready</button></div>
   </div>
   <div class="tablewrap"><table>
-    <thead><tr><th>Date</th><th>Rx no.</th><th>Prescriber</th><th>Flags</th><th>Discrepancy</th><th>Error</th><th>Release</th><th>Checkers</th></tr></thead>
+    <thead><tr><th>Date</th><th>Rx no.</th><th>Prescriber</th><th>Flags</th><th>Discrepancy</th><th>Error</th><th>Release</th><th>Checker</th></tr></thead>
     <tbody id="r-body"></tbody></table></div>
 </section>
 <!-- ============ FOLLOW-UP ============ -->
@@ -359,7 +355,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--sunk)}
 </main>
 
 <div class="dock" id="dock"><div class="wrap">
-  <div class="prog"><div class="t"><span>Progress</span><b id="prog-t">0 of 13</b></div><div class="meter"><i id="prog-m"></i></div></div>
+  <div class="prog"><div class="t"><span>Progress</span><b id="prog-t">0 of 16</b></div><div class="meter"><i id="prog-m"></i></div></div>
   <button class="btn ghost" id="reset" type="button">Clear</button>
   <button class="btn primary" id="submit" type="button">Save sheet</button>
 </div></div>
@@ -487,7 +483,7 @@ function getPath(path){const p=path.split('.');return p.length===2?F[p[0]][p[1]]
 
 function paintForm(){
   $('#f-date').value=F.date;$('#f-rx').value=F.rxNo;$('#f-prescriber').value=F.prescriber;$('#f-dept').value=F.department||'';$('#f-shift').value=F.shift;$('#f-prescriber-sel').dataset.other='';syncPrescriberSel();
-  $('#f-action').value=F.action;$('#f-outcome').value=F.outcome;$('#f-c1').value=F.checker1;$('#f-c2').value=F.checker2;
+  $('#f-action').value=F.action;$('#f-outcome').value=F.outcome;$('#f-c1').value=F.checker1;
   for(const c of CHECKS){const i=$('#cm-'+c.id);i.value=F.comments[c.id]||'';i.parentElement.hidden=!F.comments[c.id];$(`[data-cmt="${c.id}"]`).hidden=!!F.comments[c.id]}
   refresh();
 }
@@ -503,7 +499,7 @@ function refresh(){
   $$('#types .chip').forEach(b=>b.setAttribute('aria-pressed',F.types.includes(b.dataset.type)));
   $('#outcome-wrap').hidden=F.contacted!=='yes';
   $$('.rel').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===F.release));
-  const req=[...CHECKS.map(c=>F.checks[c.id]),F.discrepancy,F.prescribingError,F.dispensingError,F.contacted,F.checker1.trim(),F.checker2.trim(),F.release];
+  const req=[...CHECKS.map(c=>F.checks[c.id]),F.discrepancy,F.prescribingError,F.dispensingError,F.contacted,F.checker1.trim(),F.release];
   const done=req.filter(Boolean).length;
   $('#prog-t').textContent=`${done} of ${req.length}`;$('#prog-m').style.width=(done/req.length*100)+'%';
   saveDraft();
@@ -534,7 +530,7 @@ $('#f-prescriber-sel').addEventListener('change',e=>{
   else{F.prescriber=v;inp.value=v;inp.hidden=true;const d=dirFor(v);if(d&&d.department){F.department=d.department;$('#f-dept').value=d.department}}
   refresh();
 });
-$('#f-prescriber').addEventListener('change',()=>{const d=dirFor(F.prescriber);if(d&&d.department&&!F.department.trim()){F.department=d.department;$('#f-dept').value=d.department;refresh()}});bind('#f-action','action');bind('#f-c1','checker1');bind('#f-c2','checker2');
+$('#f-prescriber').addEventListener('change',()=>{const d=dirFor(F.prescriber);if(d&&d.department&&!F.department.trim()){F.department=d.department;$('#f-dept').value=d.department;refresh()}});bind('#f-action','action');bind('#f-c1','checker1');
 $('#f-shift').addEventListener('change',e=>{F.shift=e.target.value;refresh()});
 $('#f-outcome').addEventListener('change',e=>{F.outcome=e.target.value;refresh()});
 for(const c of CHECKS)$('#cm-'+c.id).addEventListener('input',e=>{F.comments[c.id]=e.target.value;saveDraft()});
@@ -562,8 +558,7 @@ function validate(){
   if(!F.discrepancy||!F.prescribingError||!F.dispensingError)m.push('Discrepancy and error questions (section 4)');
   if(!F.contacted)m.push('Whether the prescriber was contacted');
   if(F.contacted==='yes'&&!F.outcome)m.push('Outcome of the prescriber contact');
-  if(!F.checker1.trim()||!F.checker2.trim())m.push('Both checker names (section 5)');
-  else if(F.checker1.trim().toLowerCase()===F.checker2.trim().toLowerCase())m.push('Checker 2 must be a different person from Checker 1');
+  if(!F.checker1.trim())m.push('Checker name (section 5)');
   if(!F.release)m.push('Final release decision');
   if(F.release==='verified'&&F.contacted==='yes'&&F.outcome==='pending')m.push('A sheet with a pending prescriber response cannot be released as verified');
   return m;
@@ -572,8 +567,8 @@ $('#submit').addEventListener('click',async()=>{
   const m=validate(),box=$('#errors');
   if(m.length){box.innerHTML=`<b>Complete these before saving:</b><ul>${m.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'center'});return}
   box.hidden=true;
-  const rec={...F,rxNo:F.rxNo.trim(),prescriber:F.prescriber.trim(),department:(F.department||'').trim(),checker1:F.checker1.trim(),checker2:F.checker2.trim(),
-    createdAt:new Date().toISOString(),sig1:pads[1].export(),sig2:pads[2].export(),example:false};
+  const rec={...F,rxNo:F.rxNo.trim(),prescriber:F.prescriber.trim(),department:(F.department||'').trim(),checker1:F.checker1.trim(),checker2:'',
+    createdAt:new Date().toISOString(),sig1:pads[1].export(),sig2:null,example:false};
   if(!(rec.discrepancy==='yes'||rec.prescribingError==='yes'||rec.dispensingError!=='no')){rec.types=[];rec.action=''}
   if(rec.contacted!=='yes')rec.outcome='';
   try{if(userId)rec.submittedBy=userId}catch(e){}
@@ -582,7 +577,7 @@ $('#submit').addEventListener('click',async()=>{
     if(db){await db.collection('checks').add(rec)}
     else{rec.id='local-'+Date.now();records.unshift(rec);renderAll()}
     toast(db?`Saved ${rec.rxNo}`:`Saved ${rec.rxNo} on this device only`);
-    F=blank();paintForm();pads[1].size();pads[2].size();window.scrollTo({top:0,behavior:'smooth'});
+    F=blank();paintForm();pads[1].size();window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){
     toast(e&&e.code==='invalid_argument'?'You have view-only access. Ask the owner for Contributor access to save sheets.':e&&e.code==='quota_exceeded'?'Storage is full. Export and archive older records.':'Could not save. Check the connection and try again.');
   }finally{$('#submit').disabled=false}
@@ -590,7 +585,7 @@ $('#submit').addEventListener('click',async()=>{
 let resetArmed=false;
 $('#reset').addEventListener('click',()=>{
   if(!resetArmed){resetArmed=true;$('#reset').textContent='Tap again to clear';setTimeout(()=>{resetArmed=false;$('#reset').textContent='Clear'},2500);return}
-  resetArmed=false;$('#reset').textContent='Clear';F=blank();paintForm();pads[1].size();pads[2].size();$('#errors').hidden=true;
+  resetArmed=false;$('#reset').textContent='Clear';F=blank();paintForm();pads[1].size();$('#errors').hidden=true;
 });
 function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3200)}
 
@@ -648,7 +643,7 @@ function renderDash(){
   const cy=L.filter(r=>r.contacted==='yes'),cn=L.filter(r=>r.contacted==='no').length;
   $('#contact').innerHTML=`<div><b>${cy.length}</b><span>Contacted</span></div><div><b>${cn}</b><span>Not contacted</span></div><div><b>${pct(cy.filter(r=>r.outcome==='accepted').length,cy.length)}</b><span>Acceptance rate</span></div>`;
   const sec4=r=>r.discrepancy!=null&&!(r.note||'').includes('inferred'),sec3=r=>r.paper?!!r.sec3Done:true;
-  const comp=[['Section 3 (product) filled',L.filter(sec3).length],['Section 4 answered',L.filter(sec4).length],['Both checkers signed',L.filter(r=>r.checker1&&r.checker2).length],['Prescriber written',L.filter(r=>r.prescriber).length],['Final release ticked',L.filter(r=>r.release).length]];
+  const comp=[['Section 3 (product) filled',L.filter(sec3).length],['Section 4 answered',L.filter(sec4).length],['Checker signed',L.filter(r=>r.checker1).length],['Prescriber written',L.filter(r=>r.prescriber).length],['Final release ticked',L.filter(r=>r.release).length]];
   const ce=$('#complete-chart');ce.innerHTML=n?comp.map(([l,v])=>{const p=v/n*100;return `<div class="hb" data-tip="${esc(l)}: ${v} of ${n} sheets"><span class="l">${l}</span><span class="track"><i style="width:${p}%;background:${p<60?'var(--bad)':p<90?'var(--warn)':'var(--ok)'}"></i></span><span class="n">${Math.round(p)}%</span></div>`}).join(''):'<div class="empty">No sheets in this period.</div>';
   hbars('#outcome-chart',Object.entries(OUTCOMES).map(([k,l])=>[l,cy.filter(r=>r.outcome===k).length]),cy.length,'of contacts','No prescriber contacts in this period.');
 }
@@ -713,7 +708,7 @@ function renderRecords(){
   $('#r-count').textContent=`${L.length} of ${records.length} sheet${records.length===1?'':'s'}`;
   $('#r-body').innerHTML=L.length?L.map(r=>{const f=flagsOf(r);return `<tr data-id="${esc(r.id)}"><td class="mono">${esc(r.date)}</td><td class="mono">${esc(r.rxNo)}${r.example?'<span class="ex">EXAMPLE</span>':r.paper?'<span class="ex">PAPER</span>':''}</td><td>${esc(r.prescriber)||'–'}</td>
     <td>${f?`<span class="pill bad">${f} flagged</span>`:'<span class="pill ok">Clear</span>'}</td><td>${hasDisc(r)?'<span class="pill warn">Yes</span>':r.discrepancy==='no'?'<span class="pill mut">No</span>':'<span class="pill mut">Blank</span>'}</td><td>${errLabel(r)}</td>
-    <td>${relPill(r)}</td><td>${esc(r.checker1)} / ${esc(r.checker2)}</td></tr>`}).join('')
+    <td>${relPill(r)}</td><td>${esc(r.checker1)}${r.checker2?' / '+esc(r.checker2):''}</td></tr>`}).join('')
     :`<tr><td colspan="8" class="empty">${records.length?'No sheets match this filter.':'No sheets yet. Saved sheets from every device appear here.'}</td></tr>`;
 }
 $('#r-search').addEventListener('input',renderRecords);
@@ -730,8 +725,8 @@ function openDetail(r){
     ${(r.types||[]).length?`<span>Type</span><b style="text-align:right">${r.types.map(esc).join(', ')}</b>`:''}
     <span>Prescriber contacted</span><b>${{na:'N/A',no:'No',yes:'Yes'}[r.contacted]||'–'}</b>${r.outcome?`<span>Outcome</span><b>${OUTCOMES[r.outcome]}</b>`:''}</div>
     ${r.action?`<p style="background:var(--sunk);padding:10px 12px;border-radius:8px;font-size:14px;margin:10px 0 0">${esc(r.action)}</p>`:''}`;
-  h+=`<h4>5. Independent final verification</h4><div class="dl"><span>Checker 1 (Preparer)</span><b>${esc(r.checker1)}</b>${r.sig1?`<img class="sigimg c" src="${esc(r.sig1)}" alt="Signature of ${esc(r.checker1)}">`:''}
-    <span>Checker 2 (Independent)</span><b>${esc(r.checker2)}</b>${r.sig2?`<img class="sigimg c" src="${esc(r.sig2)}" alt="Signature of ${esc(r.checker2)}">`:''}
+  h+=`<h4>5. Final verification</h4><div class="dl"><span>${r.checker2?'Checker 1':'Checker'}</span><b>${esc(r.checker1)}</b>${r.sig1?`<img class="sigimg c" src="${esc(r.sig1)}" alt="Signature of ${esc(r.checker1)}">`:''}
+    ${r.checker2?`<span>Checker 2</span><b>${esc(r.checker2)}</b>${r.sig2?`<img class="sigimg c" src="${esc(r.sig2)}" alt="Signature of ${esc(r.checker2)}">`:''}`:''}
     <span>Final release</span>${relPill(r)}</div>${r.note?`<h4>Transcription notes</h4><p style="font-size:13px;color:var(--muted);margin:0">${esc(r.note)}</p>`:''}
     <p style="color:var(--muted);font-size:12px;margin-top:18px">Saved ${r.createdAt?new Date(r.createdAt).toLocaleString('en-GB'):''}</p>`;
   $('#drawer').innerHTML=h;$('#scrim').hidden=false;$('#close').focus();
@@ -873,7 +868,7 @@ function route(){
   for(const k of V)$('#v-'+k).hidden=k!==v;
   $$('.tabs a').forEach(a=>a.dataset.view===v?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current'));
   $('#dock').hidden=v!=='new';
-  if(v==='new'){pads[1].size();pads[2].size()}
+  if(v==='new'){pads[1].size()}
   if(v==='dashboard')renderDash();
   if(v==='followup')renderFollow();
 }
