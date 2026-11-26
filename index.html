@@ -751,6 +751,10 @@ function fuGroups(){
   for(const r of L){const key=FU.group==='doctor'?docName(r):deptOf(r);(g[key]=g[key]||[]).push(r)}
   return {a,b,L,groups:Object.entries(g).sort((x,y)=>y[1].length-x[1].length)};
 }
+const EMAIL_RE=/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+function mailsFor(name,list){
+  const src=FU.group==='doctor'?[dirFor(name)]:[...new Set(list.map(r=>r.prescriber))].map(dirFor);
+  return [...new Set(src.filter(Boolean).map(d=>String(d.contact||'').trim()).filter(c=>EMAIL_RE.test(c)))]}
 function periodLabel(a,b){return a===b?a:`${a} to ${b}`}
 function fuKey(a,b,name){return `${FU.group}_${a}_${b}_${hashId(name)}`}
 function message(name,list,a,b){
@@ -783,7 +787,8 @@ function renderFollow(){
     const pill=!f?'<span class="pill warn">Not sent</span>':f.status==='acknowledged'?'<span class="pill ok">Acknowledged</span>':'<span class="pill mut">Sent</span>';
     return `<div class="fu"><header><div class="who"><b>${esc(name)}</b><span>${esc(sub)}</span></div><span class="pill bad">${list.length} error${list.length>1?'s':''}</span>${pill}</header>
       <div class="items">${list.map(r=>`<div class="it"><span class="mono">${esc(r.rxNo)}<small>${esc(r.date)}</small></span><div>${(r.types||[]).length?`<b>${r.types.map(esc).join(', ')}</b>`:'<b>Prescribing error</b>'}${r.action?`<small>${esc(r.action)}</small>`:''}${r.outcome?`<small>Outcome: ${OUTCOMES[r.outcome]}</small>`:''}${FU.group==='dept'?`<small>${esc(docName(r))}</small>`:''}</div></div>`).join('')}</div>
-      <footer><span class="meta2">${f?`${f.status==='acknowledged'?'Acknowledged':'Sent'} ${esc((f.updatedAt||'').slice(0,10))}`:'Copy the summary, send it by email or the hospital system, then mark it as sent.'}</span>
+      <footer><span class="meta2">${f?`${f.status==='acknowledged'?'Acknowledged':'Sent'} ${esc((f.updatedAt||'').slice(0,10))}`:'Send the summary by email, then mark it as sent.'}</span>
+        <button class="btn ghost sm" data-mail="${esc(name)}" type="button">Send email</button>
         <button class="btn ghost sm" data-copy="${esc(name)}" type="button">Copy summary</button>
         <button class="btn ghost sm" data-file="${esc(name)}" type="button">Save as file</button>
         ${db?(!f?`<button class="btn primary sm" data-mark="sent" data-name="${esc(name)}" type="button">Mark as sent</button>`:f.status==='sent'?`<button class="btn ghost sm" data-mark="acknowledged" data-name="${esc(name)}" type="button">Mark acknowledged</button><button class="btn ghost sm" data-mark="undo" data-name="${esc(name)}" type="button">Undo</button>`:`<button class="btn ghost sm" data-mark="undo" data-name="${esc(name)}" type="button">Undo</button>`):''}
@@ -800,8 +805,16 @@ async function saveText(name,text,ext,type){
 }
 $('#fu-list').addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;const {a,b:bb,groups}=fuGroups();
-  const name=b.dataset.copy||b.dataset.file||b.dataset.name;const g=groups.find(x=>x[0]===name);if(!g)return;
+  const name=b.dataset.mail||b.dataset.copy||b.dataset.file||b.dataset.name;const g=groups.find(x=>x[0]===name);if(!g)return;
   const text=message(name,g[1],a,bb);
+  if(b.dataset.mail){
+    const to=mailsFor(name,g[1]),subject=`Prescription clarification – ${periodLabel(a,bb)}`;
+    let url=`mailto:${to.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+    if(url.length>1800){let copied=false;try{await navigator.clipboard.writeText(text);copied=true}catch(_){}
+      url=`mailto:${to.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(copied?'(Summary copied – paste it here)':'(Use Copy summary or Save as file and paste the summary here)')}`;
+      toast(copied?'Summary is long, so it was copied. Paste it into the email.':'Summary is long. Use Copy summary and paste it into the email.')}
+    else if(!to.length)toast('No email saved for this doctor. Add it under Doctors & departments.');
+    location.href=url;return}
   if(b.dataset.copy){try{await navigator.clipboard.writeText(text);toast('Summary copied. Paste it into an email or message.')}catch(_){toast('Copy is blocked here. Use Save as file instead.')}return}
   if(b.dataset.file){await saveText(`rx-followup-${a}-${name.replace(/[^\w\u0600-\u06FF]+/g,'-').slice(0,40)}`,text,'txt','text/plain');return}
   if(b.dataset.mark&&db){const ref=db.collection('followups').doc(fuKey(a,bb,name));b.disabled=true;
