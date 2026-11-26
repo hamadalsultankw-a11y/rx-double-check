@@ -254,7 +254,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--sunk)}
       <div class="meta">
         <label class="f">Date<input type="date" id="f-date"></label>
         <label class="f">Prescription no.<input type="text" id="f-rx" inputmode="text" placeholder="e.g. RX-48213" autocomplete="off"></label>
-        <label class="f">Prescriber<input type="text" id="f-prescriber" placeholder="Dr. name or code" autocomplete="off" list="prescribers"></label>
+        <label class="f">Prescriber<select id="f-prescriber-sel" hidden><option value="">Select doctor…</option></select><input type="text" id="f-prescriber" placeholder="Dr. name or code" autocomplete="off" list="prescribers"></label>
         <label class="f">Department / clinic<input type="text" id="f-dept" placeholder="e.g. Endocrinology" autocomplete="off" list="depts"></label>
         <label class="f">Shift<select id="f-shift"><option value="morning">Morning</option><option value="evening">Evening</option><option value="night">Night</option></select></label>
       </div>
@@ -486,7 +486,7 @@ function setPath(path,v){const p=path.split('.');if(p.length===2)F[p[0]][p[1]]=v
 function getPath(path){const p=path.split('.');return p.length===2?F[p[0]][p[1]]:F[p[0]]}
 
 function paintForm(){
-  $('#f-date').value=F.date;$('#f-rx').value=F.rxNo;$('#f-prescriber').value=F.prescriber;$('#f-dept').value=F.department||'';$('#f-shift').value=F.shift;
+  $('#f-date').value=F.date;$('#f-rx').value=F.rxNo;$('#f-prescriber').value=F.prescriber;$('#f-dept').value=F.department||'';$('#f-shift').value=F.shift;$('#f-prescriber-sel').dataset.other='';syncPrescriberSel();
   $('#f-action').value=F.action;$('#f-outcome').value=F.outcome;$('#f-c1').value=F.checker1;$('#f-c2').value=F.checker2;
   for(const c of CHECKS){const i=$('#cm-'+c.id);i.value=F.comments[c.id]||'';i.parentElement.hidden=!F.comments[c.id];$(`[data-cmt="${c.id}"]`).hidden=!!F.comments[c.id]}
   refresh();
@@ -516,6 +516,24 @@ document.addEventListener('click',e=>{
 });
 const bind=(sel,key)=>$(sel).addEventListener('input',e=>{F[key]=e.target.value;refresh()});
 bind('#f-date','date');bind('#f-rx','rxNo');bind('#f-prescriber','prescriber');bind('#f-dept','department');
+/* prescriber dropdown: doctors from the directory, plus "Other" to type a name */
+const OTHER='__other';
+function syncPrescriberSel(){
+  const sel=$('#f-prescriber-sel'),inp=$('#f-prescriber');
+  const names=[...new Set(directory.map(d=>String(d.name||'').trim()).filter(Boolean))].sort((x,y)=>norm(x).localeCompare(norm(y)));
+  if(!names.length){sel.hidden=true;inp.hidden=false;return}
+  sel.innerHTML='<option value="">Select doctor…</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')+`<option value="${OTHER}">Other / not listed…</option>`;
+  const hit=F.prescriber.trim()?names.find(n=>norm(n)===norm(F.prescriber)):null;
+  const other=!hit&&(!!F.prescriber.trim()||sel.dataset.other==='1');
+  sel.value=hit||(other?OTHER:'');sel.hidden=false;inp.hidden=!other;
+}
+$('#f-prescriber-sel').addEventListener('change',e=>{
+  const v=e.target.value,inp=$('#f-prescriber');
+  e.target.dataset.other=v===OTHER?'1':'';
+  if(v===OTHER){const pd=dirFor(F.prescriber);if(pd&&pd.department&&pd.department===F.department){F.department='';$('#f-dept').value=''}F.prescriber='';inp.value='';inp.hidden=false;inp.focus()}
+  else{F.prescriber=v;inp.value=v;inp.hidden=true;const d=dirFor(v);if(d&&d.department){F.department=d.department;$('#f-dept').value=d.department}}
+  refresh();
+});
 $('#f-prescriber').addEventListener('change',()=>{const d=dirFor(F.prescriber);if(d&&d.department&&!F.department.trim()){F.department=d.department;$('#f-dept').value=d.department;refresh()}});bind('#f-action','action');bind('#f-c1','checker1');bind('#f-c2','checker2');
 $('#f-shift').addEventListener('change',e=>{F.shift=e.target.value;refresh()});
 $('#f-outcome').addEventListener('change',e=>{F.outcome=e.target.value;refresh()});
@@ -847,7 +865,7 @@ function renderAll(){
   const uniq=k=>[...new Set(records.map(r=>r[k]).filter(Boolean))].slice(0,40);
   $('#prescribers').innerHTML=[...new Set([...directory.map(d=>d.name),...uniq('prescriber').filter(v=>!isNoDoc(v))])].map(v=>`<option value="${esc(v)}">`).join('');
   $('#depts').innerHTML=[...new Set([...directory.map(d=>d.department),...uniq('department')].filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join('');
-  renderFollow();
+  renderFollow();syncPrescriberSel();
   $('#staff').innerHTML=[...new Set([...uniq('checker1'),...uniq('checker2')])].map(v=>`<option value="${esc(v)}">`).join('');
 }
 function route(){
