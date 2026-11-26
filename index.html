@@ -286,7 +286,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--sunk)}
       <header><span class="n">05</span><h2>Final verification</h2></header>
       <div class="signs">
         <div><h3>Checker</h3>
-          <label class="f">Name<input type="text" id="f-c1" autocomplete="off" list="staff"></label>
+          <label class="f">Name<select id="f-c1-sel" hidden><option value="">Select pharmacist…</option></select><input type="text" id="f-c1" autocomplete="off" list="staff"></label>
           <div class="pad" data-pad="1"><canvas></canvas><span>Sign here</span><button type="button" class="clr">Clear</button></div></div>
       </div>
       <datalist id="staff"></datalist>
@@ -351,6 +351,10 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--sunk)}
     <div class="tablewrap"><table><thead><tr><th>Doctor</th><th>Department</th><th>Contact (email / ext.)</th><th></th></tr></thead><tbody id="dir-body"></tbody></table></div>
     <form id="dir-form"><input type="text" id="dir-name" placeholder="Doctor name" list="prescribers" autocomplete="off"><input type="text" id="dir-dept" placeholder="Department" list="depts" autocomplete="off"><input type="text" id="dir-contact" placeholder="Email or extension" autocomplete="off"><button class="btn primary sm" type="submit">Add</button></form>
   </div>
+  <div class="card dir"><h3>Pharmacists</h3><p class="sub">Names shown in the Checker list on the New check form.</p>
+    <div class="tablewrap"><table style="min-width:0"><thead><tr><th>Pharmacist</th><th></th></tr></thead><tbody id="ph-body"></tbody></table></div>
+    <form id="ph-form" style="grid-template-columns:minmax(0,1fr) auto"><input type="text" id="ph-name" placeholder="Pharmacist name" autocomplete="off"><button class="btn primary sm" type="submit">Add</button></form>
+  </div>
 </section>
 </main>
 
@@ -380,7 +384,7 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbx2oOT9I3-niPhVJWudXfzw
 (function(){
   const CK='rxdc-access-code';
   let code=null;try{code=localStorage.getItem(CK)}catch(e){}
-  const cache={checks:[],prescribers:[],followups:[]},subs={checks:[],prescribers:[],followups:[]};
+  const cache={checks:[],prescribers:[],followups:[],staff:[]},subs={checks:[],prescribers:[],followups:[],staff:[]};
   let loaded=false,timer=null,busy=null;
   const configured=()=>API_URL&&!API_URL.startsWith('__');
   function gate(msg){const g=document.getElementById('gate');if(!g)return;
@@ -482,7 +486,7 @@ function setPath(path,v){const p=path.split('.');if(p.length===2)F[p[0]][p[1]]=v
 function getPath(path){const p=path.split('.');return p.length===2?F[p[0]][p[1]]:F[p[0]]}
 
 function paintForm(){
-  $('#f-date').value=F.date;$('#f-rx').value=F.rxNo;$('#f-prescriber').value=F.prescriber;$('#f-dept').value=F.department||'';$('#f-shift').value=F.shift;$('#f-prescriber-sel').dataset.other='';syncPrescriberSel();
+  $('#f-date').value=F.date;$('#f-rx').value=F.rxNo;$('#f-prescriber').value=F.prescriber;$('#f-dept').value=F.department||'';$('#f-shift').value=F.shift;$('#f-prescriber-sel').dataset.other='';syncPrescriberSel();$('#f-c1-sel').dataset.other='';syncCheckerSel();
   $('#f-action').value=F.action;$('#f-outcome').value=F.outcome;$('#f-c1').value=F.checker1;
   for(const c of CHECKS){const i=$('#cm-'+c.id);i.value=F.comments[c.id]||'';i.parentElement.hidden=!F.comments[c.id];$(`[data-cmt="${c.id}"]`).hidden=!!F.comments[c.id]}
   refresh();
@@ -514,6 +518,26 @@ const bind=(sel,key)=>$(sel).addEventListener('input',e=>{F[key]=e.target.value;
 bind('#f-date','date');bind('#f-rx','rxNo');bind('#f-prescriber','prescriber');bind('#f-dept','department');
 /* prescriber dropdown: doctors from the directory, plus "Other" to type a name */
 const OTHER='__other';
+/* checker dropdown: pharmacists list, plus "Other" to type a name */
+function syncCheckerSel(){
+  const sel=$('#f-c1-sel'),inp=$('#f-c1');
+  const names=[...new Set(pharmacists.map(d=>String(d.name||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y));
+  if(!names.length){sel.hidden=true;inp.hidden=false;return}
+  sel.innerHTML='<option value="">Select pharmacist…</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')+`<option value="${OTHER}">Other / not listed…</option>`;
+  const k=v=>String(v||'').trim().toLowerCase(),hit=F.checker1.trim()?names.find(n=>k(n)===k(F.checker1)):null;
+  const other=!hit&&(!!F.checker1.trim()||sel.dataset.other==='1');
+  sel.value=hit||(other?OTHER:'');sel.hidden=false;inp.hidden=!other;
+}
+$('#f-c1-sel').addEventListener('change',e=>{
+  const v=e.target.value,inp=$('#f-c1');e.target.dataset.other=v===OTHER?'1':'';
+  if(v===OTHER){F.checker1='';inp.value='';inp.hidden=false;inp.focus()}else{F.checker1=v;inp.value=v;inp.hidden=true}
+  refresh();
+});
+function renderPharmacists(){
+  const b=$('#ph-body');if(!b)return;
+  b.innerHTML=pharmacists.length?pharmacists.slice().sort((x,y)=>String(x.name).localeCompare(y.name)).map(d=>`<tr><td>${esc(d.name)}</td><td style="text-align:right">${db?`<button class="btn ghost sm" data-delph="${esc(d.id)}" type="button">Remove</button>`:''}</td></tr>`).join('')
+    :'<tr><td colspan="2" class="empty">No pharmacists added yet. Add names below.</td></tr>';
+}
 function syncPrescriberSel(){
   const sel=$('#f-prescriber-sel'),inp=$('#f-prescriber');
   const names=[...new Set(directory.map(d=>String(d.name||'').trim()).filter(Boolean))].sort((x,y)=>norm(x).localeCompare(norm(y)));
@@ -590,7 +614,7 @@ $('#reset').addEventListener('click',()=>{
 function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3200)}
 
 /* ---------- data ---------- */
-let directory=[],followups={},FU={period:'day',date:null,group:'doctor'};
+let directory=[],pharmacists=[],followups={},FU={period:'day',date:null,group:'doctor'};
 let db=null,userId=null,records=[],isOwner=false,RANGE=0,RF="all";
 function setConn(s,t){const c=$('#conn');c.dataset.s=s;c.querySelector('span').textContent=t}
 (async()=>{
@@ -605,6 +629,7 @@ function setConn(s,t){const c=$('#conn');c.dataset.s=s;c.querySelector('span').t
     if(!snap.metadata.fromCache){clearTimeout(timer);setConn('live','Synced')}
     records=snap.docs.map(x=>({id:x.id,...x.data()}));renderAll();
   },err=>{clearTimeout(timer);setConn('local','Offline');});
+  db.collection('staff').onSnapshot(s=>{pharmacists=s.docs.map(x=>({id:x.id,...x.data()}));renderAll()},()=>{});
   db.collection('prescribers').onSnapshot(s=>{directory=s.docs.map(x=>({id:x.id,...x.data()}));renderAll()},()=>{});
   db.collection('followups').onSnapshot(s=>{followups={};s.docs.forEach(x=>followups[x.id]=x.data());renderFollow()},()=>{});
 })();
@@ -847,6 +872,14 @@ $('#dir-form').addEventListener('submit',async e=>{e.preventDefault();
   if(!db){toast('Saving the directory needs the shared database');return}
   try{const ex=dirFor(name);await db.collection('prescribers').doc(ex?ex.id:'d'+hashId(norm(name))).set({name,department,contact});$('#dir-form').reset();toast(`Saved ${name}`)}
   catch(_){toast('Could not save. You may have view-only access.')}});
+$('#ph-form').addEventListener('submit',async e=>{e.preventDefault();
+  const name=$('#ph-name').value.trim();if(!name){toast('Enter the pharmacist name');return}
+  if(!db){toast('Saving the list needs the shared database');return}
+  try{await db.collection('staff').doc('s'+hashId(name.toLowerCase().replace(/\s+/g,' '))).set({name});$('#ph-form').reset();toast(`Saved ${name}`)}
+  catch(_){toast('Could not save. The data sheet may need the latest Apps Script update.')}});
+$('#ph-body').addEventListener('click',async e=>{const b=e.target.closest('[data-delph]');if(!b||!db)return;
+  if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Confirm remove';b.className='btn danger sm';return}
+  try{await db.collection('staff').doc(b.dataset.delph).delete();toast('Removed')}catch(_){toast('Could not remove')}});
 $('#dir-body').addEventListener('click',async e=>{const b=e.target.closest('[data-deldir]');if(!b||!db)return;
   if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Confirm remove';b.className='btn danger sm';return}
   try{await db.collection('prescribers').doc(b.dataset.deldir).delete();toast('Removed')}catch(_){toast('Could not remove')}});
@@ -860,7 +893,7 @@ function renderAll(){
   const uniq=k=>[...new Set(records.map(r=>r[k]).filter(Boolean))].slice(0,40);
   $('#prescribers').innerHTML=[...new Set([...directory.map(d=>d.name),...uniq('prescriber').filter(v=>!isNoDoc(v))])].map(v=>`<option value="${esc(v)}">`).join('');
   $('#depts').innerHTML=[...new Set([...directory.map(d=>d.department),...uniq('department')].filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join('');
-  renderFollow();syncPrescriberSel();
+  renderFollow();syncPrescriberSel();syncCheckerSel();renderPharmacists();
   $('#staff').innerHTML=[...new Set([...uniq('checker1'),...uniq('checker2')])].map(v=>`<option value="${esc(v)}">`).join('');
 }
 function route(){
